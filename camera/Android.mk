@@ -1,55 +1,41 @@
 #
-# Copyright (C) 2013 Paul Kocialkowski
+# Copyright (C) 2017 The LineageOS Project
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 #
-
-ifneq ($(filter i9300 i9305 n7100 t0lte t0lteatt t0ltetmo i605 l900 r950,$(TARGET_DEVICE)),)
 
 LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	exynos_camera.c \
-	exynos_exif.c \
-	exynos_jpeg.c \
-	exynos_param.c \
-	exynos_utils.c \
-	exynos_v4l2.c \
-	exynos_v4l2_output.c
+	SecCameraHWInterface.cpp
+
+LOCAL_SHARED_LIBRARIES := libutils libcutils liblog libcamera_client libhardware
+LOCAL_SHARED_LIBRARIES := libhwjpeg libfimc libsecion
 
 LOCAL_C_INCLUDES := \
-	$(LOCAL_PATH)/include \
 	system/media/camera/include \
 	hardware/samsung/exynos4/hal/include
 
-LOCAL_SHARED_LIBRARIES := libutils libcutils liblog libcamera_client libhardware
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
+LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/media
+LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
+
 LOCAL_PRELINK_MODULE := false
-
-ifeq ($(TARGET_SOC),exynos4x12)
-	LOCAL_SHARED_LIBRARIES += libhwjpeg
-	LOCAL_CFLAGS += -DEXYNOS_JPEG_HW
-
-	LOCAL_SRC_FILES += exynos_ion.c
-	LOCAL_CFLAGS += -DEXYNOS_ION
-endif
 
 LOCAL_MODULE := camera.$(TARGET_BOOTLOADER_BOARD_NAME)
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_SHARED_LIBRARY)
-
-endif
