@@ -1,41 +1,48 @@
-#
-# Copyright (C) 2017 The LineageOS Project
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+ifneq ($(TARGET_PROVIDES_CAMERA_HAL),true)
 
-LOCAL_PATH := $(call my-dir)
-
+LOCAL_PATH:= $(call my-dir)
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES := \
-	SecCameraHWInterface.cpp
+# HAL module implemenation stored in
+# hw/<COPYPIX_HARDWARE_MODULE_ID>.<ro.product.board>.so
+LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 
-LOCAL_SHARED_LIBRARIES := libutils libcutils liblog libcamera_client libhardware
-LOCAL_SHARED_LIBRARIES := libhwjpeg libfimc libsecion
+LOCAL_C_INCLUDES += \
+	hardware/samsung/exynos4/hal/include \
+	system/media/camera/include
 
-LOCAL_C_INCLUDES := \
-	system/media/camera/include \
-	hardware/samsung/exynos4/hal/include
+LOCAL_SRC_FILES:= \
+	SecCamera.cpp SecCameraHWInterface.cpp
+
+LOCAL_SHARED_LIBRARIES:= libutils libcutils libbinder liblog libcamera_client libhardware
+
+ifeq ($(TARGET_SOC), exynos4210)
+LOCAL_SHARED_LIBRARIES += libs5pjpeg
+LOCAL_CFLAGS += -DSAMSUNG_EXYNOS4210
+endif
+
+ifeq ($(TARGET_SOC), exynos4x12)
+LOCAL_SHARED_LIBRARIES += libhwjpeg
+LOCAL_CFLAGS += -DSAMSUNG_EXYNOS4x12
+endif
+
+ifeq ($(BOARD_USE_V4L2), true)
+LOCAL_CFLAGS += -DBOARD_USE_V4L2
+endif
+
+ifeq ($(BOARD_USE_V4L2_ION), true)
+LOCAL_CFLAGS += -DBOARD_USE_V4L2
+LOCAL_CFLAGS += -DBOARD_USE_V4L2_ION
+endif
 
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include
 LOCAL_C_INCLUDES += $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr/include/media
 LOCAL_ADDITIONAL_DEPENDENCIES := $(TARGET_OUT_INTERMEDIATES)/KERNEL_OBJ/usr
 
-LOCAL_PRELINK_MODULE := false
-
 LOCAL_MODULE := camera.$(TARGET_BOOTLOADER_BOARD_NAME)
-LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
+
 LOCAL_MODULE_TAGS := optional
 
 include $(BUILD_SHARED_LIBRARY)
+
+endif
