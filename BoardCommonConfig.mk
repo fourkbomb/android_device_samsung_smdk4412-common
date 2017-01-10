@@ -52,6 +52,9 @@ TARGET_PROVIDES_INIT_TARGET_RC := true
 
 TARGET_SLSI_VARIANT := cm
 
+# Headers
+TARGET_SPECIFIC_HEADER_PATH += device/samsung/smdk4412-common/include
+
 # Kernel
 BOARD_KERNEL_CMDLINE := console=ttySAC2,115200
 BOARD_KERNEL_BASE := 0x40000000
