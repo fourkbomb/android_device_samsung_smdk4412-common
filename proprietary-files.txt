@@ -1,4 +1,3 @@
-bin/cbd
 bin/bcm4334.hcd
 bin/bcm4334_murata.hcd
 bin/bcm4334_semco.hcd
@@ -20,14 +19,10 @@ etc/wifi/nvram_net.txt_semcosh
 lib/egl/libEGL_mali.so
 lib/egl/libGLESv1_CM_mali.so
 lib/egl/libGLESv2_mali.so
-lib/libcec.so
-lib/libddc.so
-lib/libedid.so
 lib/libMali.so
 lib/libMcClient.so
 lib/libMcRegistry.so
 lib/libMcVersion.so
-lib/libsecnativefeature.so
 usr/idc/melfas_ts.idc
 usr/idc/sec_touchscreen.idc
 usr/keylayout/gpio-keys.kl
