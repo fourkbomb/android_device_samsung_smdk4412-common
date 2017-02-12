@@ -16,7 +16,7 @@
 #
 
 set -e
-DEVICE_COMMON=smdk4412-common
+DEVICE_COMMON=exynos4412-common
 DEVICE=${DEVICE:-nodevice}
 VENDOR=samsung
 
@@ -37,7 +37,7 @@ fi
 setup_vendor "$DEVICE_COMMON" "$VENDOR" "$CM_ROOT" true
 
 # Copyright headers and common guards
-write_headers "i9300 i9305 n7100 n8000 n8013 n8020 t0lte t0lteatt t0ltetmo i605 l900 r950 i925 n5100 n5110 n5120"
+write_headers "trats2"
 
 write_makefiles "$MY_DIR"/proprietary-files.txt
 

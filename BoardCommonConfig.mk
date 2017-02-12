@@ -31,14 +31,6 @@ TARGET_CPU_VARIANT := cortex-a9
 ARCH_ARM_HAVE_NEON := true
 ARCH_ARM_HAVE_TLS_REGISTER := true
 
-EXYNOS4X12_ENHANCEMENTS := true
-EXYNOS4_ENHANCEMENTS := true
-
-ifdef EXYNOS4X12_ENHANCEMENTS
-BOARD_GLOBAL_CFLAGS += -DEXYNOS4_ENHANCEMENTS
-BOARD_GLOBAL_CFLAGS += -DEXYNOS4X12_ENHANCEMENTS
-endif
-
 BOARD_VENDOR := samsung
 TARGET_BOARD_PLATFORM := exynos4
 TARGET_SOC := exynos4x12
@@ -54,8 +46,6 @@ TARGET_PROVIDES_INIT_TARGET_RC := true
 BOARD_KERNEL_CMDLINE := console=ttySAC2,115200
 BOARD_KERNEL_BASE := 0x40000000
 BOARD_KERNEL_PAGESIZE := 2048
-KERNEL_TOOLCHAIN := $(ANDROID_BUILD_TOP)/prebuilts/gcc/$(HOST_OS)-x86/arm/arm-eabi-4.8/bin
-TARGET_KERNEL_CROSS_COMPILE_PREFIX := arm-eabi-
 
 # Filesystem
 BOARD_NAND_PAGE_SIZE := 4096
@@ -69,7 +59,7 @@ TARGET_USERIMAGES_USE_EXT4 := true
 
 # Hardware tunables
 BOARD_HARDWARE_CLASS := hardware/samsung/cmhw \
-    device/samsung/smdk4412-common/cmhw
+    device/samsung/exynos4412-common/cmhw
 
 # Graphics
 BOARD_EGL_NEEDS_HANDLE_VALUE := true
@@ -108,7 +98,7 @@ BOARD_USE_CSC_FIMC := false
 EXTENDED_FONT_FOOTPRINT := true
 
 # Logging
-TARGET_USES_LOGD := false
+TARGET_USES_LOGD := true
 
 BOARD_USES_LEGACY_MMAP := true
 
@@ -136,14 +126,14 @@ BOARD_HAVE_SAMSUNG_WIFI          := true
 BOARD_HAVE_BLUETOOTH := true
 BOARD_HAVE_BLUETOOTH_BCM := true
 BOARD_HAVE_SAMSUNG_BLUETOOTH := true
-BOARD_CUSTOM_BT_CONFIG := device/samsung/smdk4412-common/bluetooth/vnd_smdk4x12.txt
+BOARD_CUSTOM_BT_CONFIG := device/samsung/exynos4412-common/bluetooth/vnd_smdk4x12.txt
 
 # Vold
 TARGET_USE_CUSTOM_LUN_FILE_PATH := "/sys/devices/platform/s3c-usbgadget/gadget/lun%d/file"
 
 # Recovery
-BOARD_CUSTOM_RECOVERY_KEYMAPPING := ../../device/samsung/smdk4412-common/recovery/recovery_keys.c
-BOARD_CUSTOM_GRAPHICS := ../../../device/samsung/smdk4412-common/recovery/graphics.c
+BOARD_CUSTOM_RECOVERY_KEYMAPPING := ../../device/samsung/exynos4412-common/recovery/recovery_keys.c
+BOARD_CUSTOM_GRAPHICS := ../../../device/samsung/exynos4412-common/recovery/graphics.c
 BOARD_USE_CUSTOM_RECOVERY_FONT := \"roboto_15x24.h\"
 BOARD_UMS_LUNFILE := "/sys/class/android_usb/android0/f_mass_storage/lun0/file"
 BOARD_USES_MMCUTILS := true
@@ -152,7 +142,7 @@ BOARD_HAS_NO_MISC_PARTITION := true
 BOARD_HAS_NO_SELECT_BUTTON := true
 
 # SELinux
-BOARD_SEPOLICY_DIRS += device/samsung/smdk4412-common/selinux
+BOARD_SEPOLICY_DIRS += device/samsung/exynos4412-common/selinux
 
 # Charging mode
 BOARD_CHARGING_MODE_BOOTING_LPM := /sys/class/power_supply/battery/batt_lp_charging
@@ -170,4 +160,4 @@ BOARD_HAL_STATIC_LIBRARIES := libhealthd.exynos4
 BOARD_CHARGER_SHOW_PERCENTAGE := true
 
 # inherit from the proprietary version
--include vendor/samsung/smdk4412-common/BoardConfigVendor.mk
+-include vendor/samsung/exynos4412-common/BoardConfigVendor.mk

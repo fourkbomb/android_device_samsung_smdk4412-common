@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-COMMON_PATH := device/samsung/smdk4412-common
+COMMON_PATH := device/samsung/exynos4412-common
 
 DEVICE_PACKAGE_OVERLAYS := $(COMMON_PATH)/overlay
 
@@ -173,9 +173,8 @@ PRODUCT_TAGS += dalvik.gc.type-precise
 $(call inherit-product, frameworks/native/build/phone-xhdpi-1024-dalvik-heap.mk)
 
 # Include exynos4 platform specific parts
-TARGET_HAL_PATH := hardware/samsung/exynos4/hal
 TARGET_OMX_PATH := hardware/samsung/exynos/multimedia/openmax
 $(call inherit-product, hardware/samsung/exynos4x12.mk)
 
 # Include non-opensource parts
-$(call inherit-product, vendor/samsung/smdk4412-common/smdk4412-common-vendor.mk)
+$(call inherit-product, vendor/samsung/exynos4412-common/exynos4412-common-vendor.mk)
