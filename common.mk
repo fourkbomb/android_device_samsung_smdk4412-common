@@ -166,7 +166,13 @@ PRODUCT_PROPERTY_OVERRIDES += \
     ro.zygote.disable_gl_preload=1 \
     ro.opengles.version=131072 \
     ro.bq.gpu_to_cpu_unsupported=1 \
-    debug.hwui.render_dirty_regions=false
+    debug.hwui.render_dirty_regions=false \
+    ro.kernel.qemu=1 \
+    qemu.gles=0
+
+PRODUCT_PACKAGES += \
+    libagl \
+	libGLES_android
 
 PRODUCT_TAGS += dalvik.gc.type-precise
 
@@ -177,4 +183,4 @@ TARGET_OMX_PATH := hardware/samsung/exynos/multimedia/openmax
 $(call inherit-product, hardware/samsung/exynos4x12.mk)
 
 # Include non-opensource parts
-$(call inherit-product, vendor/samsung/exynos4412-common/exynos4412-common-vendor.mk)
+$(call inherit-product-if-exists, vendor/samsung/exynos4412-common/exynos4412-common-vendor.mk)
