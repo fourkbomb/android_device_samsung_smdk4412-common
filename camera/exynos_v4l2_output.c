@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Paul Kocialkowski
+ * Copyright (C) 2017 The LineageOS Project
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -41,7 +42,7 @@ int exynos_v4l2_output_start(struct exynos_camera *exynos_camera,
 	camera_memory_t *memory = NULL;
 	int memory_address, memory_size;
 #ifdef EXYNOS_ION
-	int memory_ion_fd = -1;
+	struct exynos_ion_data *ion_hnd = NULL;
 #endif
 	int buffers_count, buffer_length;
 	int v4l2_id;
@@ -169,14 +170,14 @@ int exynos_v4l2_output_start(struct exynos_camera *exynos_camera,
 		}
 	} else {
 #ifdef EXYNOS_ION
-		memory_ion_fd = exynos_ion_alloc(exynos_camera, buffers_count * buffer_length);
-		if (memory_ion_fd < 0) {
+		ion_hnd = exynos_ion_alloc(exynos_camera, buffers_count * buffer_length);
+		if (ion_hnd == NULL) {
 			ALOGE("%s: Unable to alloc ION memory", __func__);
 			goto error;
 		}
 
 		if (EXYNOS_CAMERA_CALLBACK_DEFINED(request_memory)) {
-			memory = exynos_camera->callbacks.request_memory(memory_ion_fd, buffer_length, buffers_count, exynos_camera->callbacks.user);
+			memory = exynos_camera->callbacks.request_memory(ion_hnd->fd, buffer_length, buffers_count, exynos_camera->callbacks.user);
 			if (memory == NULL || memory->data == NULL || memory->data == MAP_FAILED) {
 				ALOGE("%s: Unable to request memory", __func__);
 				goto error;
@@ -185,8 +186,6 @@ int exynos_v4l2_output_start(struct exynos_camera *exynos_camera,
 			ALOGE("%s: No memory request function!", __func__);
 			goto error;
 		}
-
-		memory_address = exynos_ion_phys(exynos_camera, memory_ion_fd);
 #else
 		ALOGE("%s: Unable to find memory", __func__);
 		goto error;
@@ -196,7 +195,7 @@ int exynos_v4l2_output_start(struct exynos_camera *exynos_camera,
 	output->memory = memory;
 	output->memory_address = memory_address;
 #ifdef EXYNOS_ION
-	output->memory_ion_fd = memory_ion_fd;
+	output->ion_hnd = ion_hnd;
 #endif
 	output->memory_index = 0;
 	output->buffers_count = buffers_count;
@@ -214,8 +213,8 @@ error:
 	}
 
 #ifdef EXYNOS_ION
-	if (memory_ion_fd >= 0)
-		exynos_ion_free(exynos_camera, memory_ion_fd);
+	if (ion_hnd != NULL)
+		exynos_ion_free(exynos_camera, ion_hnd);
 #endif
 
 	exynos_v4l2_close(exynos_camera, v4l2_id);
@@ -254,9 +253,9 @@ void exynos_v4l2_output_stop(struct exynos_camera *exynos_camera,
 	}
 
 #ifdef EXYNOS_ION
-	if (output->memory_ion_fd >= 0) {
-		exynos_ion_free(exynos_camera, output->memory_ion_fd);
-		output->memory_ion_fd = -1;
+	if (output->ion_hnd != NULL) {
+		exynos_ion_free(exynos_camera, output->ion_hnd);
+		output->ion_hnd = NULL;
 	}
 #endif
 

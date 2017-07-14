@@ -47,6 +47,7 @@ ifeq ($(TARGET_SOC),exynos4x12)
 
 	LOCAL_SRC_FILES += exynos_ion.c
 	LOCAL_CFLAGS += -DEXYNOS_ION
+	LOCAL_SHARED_LIBRARIES += libion
 endif
 
 LOCAL_MODULE := camera.$(TARGET_BOOTLOADER_BOARD_NAME)

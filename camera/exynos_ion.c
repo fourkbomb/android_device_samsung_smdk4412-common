@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Paul Kocialkowski
+ * Copyright (C) 2017 The LineageOS Project
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +23,7 @@
 #include <malloc.h>
 #include <ctype.h>
 
+#include <ion/ion.h>
 #include <linux/ion.h>
 
 #define LOG_TAG "exynos_ion"
@@ -38,15 +40,7 @@ int exynos_ion_init(struct exynos_camera *exynos_camera)
 
 int exynos_ion_open(struct exynos_camera *exynos_camera)
 {
-	int fd;
-
-	fd = open("/dev/ion", O_RDWR);
-	if (fd < 0) {
-		ALOGE("%s: Unable to open ion device", __func__);
-		return -1;
-	}
-
-	exynos_camera->ion_fd = fd;
+	exynos_camera->ion_fd = ion_open();
 
 	return 0;
 }
@@ -54,106 +48,44 @@ int exynos_ion_open(struct exynos_camera *exynos_camera)
 void exynos_ion_close(struct exynos_camera *exynos_camera)
 {
 	if (exynos_camera->ion_fd >= 0)
-		close(exynos_camera->ion_fd);
+		ion_close(exynos_camera->ion_fd);
 
 	exynos_camera->ion_fd = -1;
 }
 
-int exynos_ion_alloc(struct exynos_camera *exynos_camera, int size)
+struct exynos_ion_data *exynos_ion_alloc(struct exynos_camera *exynos_camera, int size)
 {
-	struct ion_allocation_data alloc_data;
-	struct ion_fd_data share_data;
-	struct ion_handle_data free_data;
-	int page_size;
-	int fd;
-	int rc;
+	int ret;
+	struct exynos_ion_data *data = malloc(sizeof(*data));
+	if (data == NULL) {
+		goto err;
+	}
 
-	page_size = getpagesize();
+	ret = ion_alloc(exynos_camera->ion_fd, size, getpagesize(), ION_HEAP_SYSTEM_MASK, 0, &data->hnd);
+	if (ret < 0) {
+		goto err_malloc;
+	}
 
-	fd = exynos_camera->ion_fd;
-	if (fd < 0)
-		return -1;
+	ret = ion_share(exynos_camera->ion_fd, data->hnd, &data->fd);
+	if (ret < 0) {
+		goto err_ion;
+	}
 
-	memset(&alloc_data, 0, sizeof(alloc_data));
-	alloc_data.len = size;
-	alloc_data.align = page_size;
-	alloc_data.flags = ION_HEAP_EXYNOS_CONTIG_MASK;
+	data->size = size;
 
-	rc = ioctl(fd, ION_IOC_ALLOC, &alloc_data);
-	if (rc < 0)
-		return -1;
-
-	memset(&share_data, 0, sizeof(share_data));
-	share_data.handle = alloc_data.handle;
-
-	rc = ioctl(fd, ION_IOC_SHARE, &share_data);
-	if (rc < 0)
-		return -1;
-
-	memset(&free_data, 0, sizeof(free_data));
-	free_data.handle = alloc_data.handle;
-
-	rc = ioctl(fd, ION_IOC_FREE, &free_data);
-	if (rc < 0)
-		return -1;
-
-	return share_data.fd;
+	return data;
+err_ion:
+	ion_free(exynos_camera->ion_fd, data->hnd);
+err_malloc:
+	free(data);
+err:
+	return NULL;
 }
 
-int exynos_ion_free(struct exynos_camera __unused *exynos_camera, int fd)
+int exynos_ion_free(struct exynos_camera *exynos_camera, struct exynos_ion_data *hnd)
 {
-	close(fd);
-	return 0;
-}
-
-int exynos_ion_phys(struct exynos_camera *exynos_camera, int fd)
-{
-	struct ion_custom_data custom_data;
-	struct ion_phys_data phys_data;
-	int rc;
-
-	memset(&phys_data, 0, sizeof(phys_data));
-	phys_data.fd_buffer = fd;
-
-	memset(&custom_data, 0, sizeof(custom_data));
-	custom_data.cmd = ION_EXYNOS_CUSTOM_PHYS;
-	custom_data.arg = (unsigned long) &phys_data;
-
-	fd = exynos_camera->ion_fd;
-	if (fd < 0)
-		return -1;
-
-	rc = ioctl(fd, ION_IOC_CUSTOM, &custom_data);
-	if (rc < 0)
-		return -1;
-
-	return (int) phys_data.phys;
-}
-
-int exynos_ion_msync(struct exynos_camera *exynos_camera, int fd,
-	int offset, int size)
-{
-	struct ion_custom_data custom_data;
-	struct ion_msync_data msync_data;
-	int rc;
-
-	memset(&msync_data, 0, sizeof(msync_data));
-	msync_data.dir = IMSYNC_SYNC_FOR_DEV | IMSYNC_DEV_TO_RW;
-	msync_data.fd_buffer = fd;
-	msync_data.offset = offset;
-	msync_data.size = size;
-
-	memset(&custom_data, 0, sizeof(custom_data));
-	custom_data.cmd = ION_EXYNOS_CUSTOM_MSYNC;
-	custom_data.arg = (unsigned long) &msync_data;
-
-	fd = exynos_camera->ion_fd;
-	if (fd < 0)
-		return -1;
-
-	rc = ioctl(fd, ION_IOC_CUSTOM, &custom_data);
-	if (rc < 0)
-		return -1;
-
+	ion_free(exynos_camera->ion_fd, hnd->hnd);
+	close(hnd->fd);
+	free(hnd);
 	return 0;
 }

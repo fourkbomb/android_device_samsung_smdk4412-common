@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Paul Kocialkowski
+ * Copyright (C) 2017 The LineageOS Project
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -42,7 +43,7 @@ int exynos_jpeg_start(struct exynos_camera *exynos_camera,
 	struct jpeg_buf *buffer_out;
 	camera_memory_t *memory = NULL;
 #ifdef EXYNOS_ION
-	int memory_ion_fd = -1;
+	struct exynos_ion_data *ion_hnd = NULL;
 #endif
 	int address;
 	int fd = -1;
@@ -62,8 +63,8 @@ int exynos_jpeg_start(struct exynos_camera *exynos_camera,
 	buffer_out = &jpeg->buffer_out;
 
 #ifdef EXYNOS_ION
-	jpeg->memory_in_ion_fd = -1;
-	jpeg->memory_out_ion_fd = -1;
+	jpeg->memory_in_ion = NULL;
+	jpeg->memory_out_ion = NULL;
 #endif
 
 	fd = jpeghal_enc_init();
@@ -104,87 +105,75 @@ int exynos_jpeg_start(struct exynos_camera *exynos_camera,
 	}
 
 	memset(buffer_in, 0, sizeof(struct jpeg_buf));
-	buffer_in->memory = V4L2_MEMORY_MMAP;
 	buffer_in->num_planes = 1;
 
 	memset(buffer_out, 0, sizeof(struct jpeg_buf));
-	buffer_out->memory = V4L2_MEMORY_MMAP;
 	buffer_out->num_planes = 1;
+
+#ifdef EXYNOS_ION
+	// Input
+
+	buffer_in->memory = V4L2_MEMORY_DMABUF;
+	buffer_in->length[0] = exynos_camera_buffer_length(jpeg->width, jpeg->height, jpeg->format);
+
+	ion_hnd = exynos_ion_alloc(exynos_camera, buffer_in->length[0]);
+	if (ion_hnd == NULL) {
+		ALOGE("%s: Unable to alloc input ION memory", __func__);
+		goto error;
+	}
+
+	if (EXYNOS_CAMERA_CALLBACK_DEFINED(request_memory)) {
+		memory = exynos_camera->callbacks.request_memory(ion_hnd->fd, buffer_in->length[0], 1, exynos_camera->callbacks.user);
+		if (memory == NULL || memory->data == NULL || memory->data == MAP_FAILED) {
+			ALOGE("%s: Unable to request memory", __func__);
+			goto error;
+		}
+	} else {
+		ALOGE("%s: No memory request function!", __func__);
+		goto error;
+	}
+
+	jpeg->memory_in = memory;
+	jpeg->memory_in_pointer = memory->data;
+	jpeg->memory_in_ion = ion_hnd;
+	buffer_in->fd[0] = ion_hnd->fd;
 
 	rc = jpeghal_set_inbuf(fd, buffer_in);
 	if (rc < 0) {
-#ifdef EXYNOS_ION
-		// Input
-
-		buffer_in->memory = V4L2_MEMORY_USERPTR;
-		buffer_in->length[0] = exynos_camera_buffer_length(jpeg->width, jpeg->height, jpeg->format);
-
-		memory_ion_fd = exynos_ion_alloc(exynos_camera, buffer_in->length[0]);
-		if (memory_ion_fd < 0) {
-			ALOGE("%s: Unable to alloc input ION memory", __func__);
-			goto error;
-		}
-
-		address = exynos_ion_phys(exynos_camera, memory_ion_fd);
-
-		if (EXYNOS_CAMERA_CALLBACK_DEFINED(request_memory)) {
-			memory = exynos_camera->callbacks.request_memory(memory_ion_fd, buffer_in->length[0], 1, exynos_camera->callbacks.user);
-			if (memory == NULL || memory->data == NULL || memory->data == MAP_FAILED) {
-				ALOGE("%s: Unable to request memory", __func__);
-				goto error;
-			}
-		} else {
-			ALOGE("%s: No memory request function!", __func__);
-			goto error;
-		}
-
-		jpeg->memory_in = memory;
-		jpeg->memory_in_pointer = memory->data;
-		jpeg->memory_in_ion_fd = memory_ion_fd;
-		buffer_in->start[0] = (void *) address;
-
-		rc = jpeghal_set_inbuf(fd, buffer_in);
-		if (rc < 0) {
-			ALOGE("%s: Unable to set input buffer", __func__);
-			goto error;
-		}
-
-		// Output
-
-		buffer_out->memory = V4L2_MEMORY_USERPTR;
-		buffer_out->length[0] = jpeg->width * jpeg->height * 4;
-
-		memory_ion_fd = exynos_ion_alloc(exynos_camera, buffer_out->length[0]);
-		if (memory_ion_fd < 0) {
-			ALOGE("%s: Unable to alloc output ION memory", __func__);
-			goto error;
-		}
-
-		address = exynos_ion_phys(exynos_camera, memory_ion_fd);
-
-		if (EXYNOS_CAMERA_CALLBACK_DEFINED(request_memory)) {
-			memory = exynos_camera->callbacks.request_memory(memory_ion_fd, buffer_out->length[0], 1, exynos_camera->callbacks.user);
-			if (memory == NULL || memory->data == NULL || memory->data == MAP_FAILED) {
-				ALOGE("%s: Unable to request memory", __func__);
-				goto error;
-			}
-		} else {
-			ALOGE("%s: No memory request function!", __func__);
-			goto error;
-		}
-
-		jpeg->memory_out = memory;
-		jpeg->memory_out_pointer = memory->data;
-		jpeg->memory_out_ion_fd = memory_ion_fd;
-		buffer_out->start[0] = (void *) address;
-#else
 		ALOGE("%s: Unable to set input buffer", __func__);
 		goto error;
-#endif
-	} else {
-		jpeg->memory_in_pointer = buffer_in->start[0];
-		jpeg->memory_out_pointer = buffer_out->start[0];
 	}
+
+	// Output
+
+	buffer_out->memory = V4L2_MEMORY_DMABUF;
+	buffer_out->length[0] = jpeg->width * jpeg->height * 4;
+
+	ion_hnd = exynos_ion_alloc(exynos_camera, buffer_out->length[0]);
+	if (ion_hnd == NULL) {
+		ALOGE("%s: Unable to alloc output ION memory", __func__);
+		goto error;
+	}
+
+	if (EXYNOS_CAMERA_CALLBACK_DEFINED(request_memory)) {
+		memory = exynos_camera->callbacks.request_memory(ion_hnd->fd, buffer_out->length[0], 1, exynos_camera->callbacks.user);
+		if (memory == NULL || memory->data == NULL || memory->data == MAP_FAILED) {
+			ALOGE("%s: Unable to request memory", __func__);
+			goto error;
+		}
+	} else {
+		ALOGE("%s: No memory request function!", __func__);
+		goto error;
+	}
+
+	jpeg->memory_out = memory;
+	jpeg->memory_out_pointer = memory->data;
+	jpeg->memory_out_ion = ion_hnd;
+	buffer_out->fd[0] = ion_hnd->fd;
+#else
+	ALOGE("%s: Unable to set input buffer", __func__);
+	goto error;
+#endif
 
 	rc = jpeghal_set_outbuf(fd, buffer_out);
 	if (rc < 0) {
@@ -202,10 +191,10 @@ error:
 		// Avoid releasing unrequested mmap buffers
 
 		if (buffer_in->memory == 0)
-			buffer_in->memory = V4L2_MEMORY_USERPTR;
+			buffer_in->memory = V4L2_MEMORY_DMABUF;
 
 		if (buffer_out->memory == 0)
-			buffer_out->memory = V4L2_MEMORY_USERPTR;
+			buffer_out->memory = V4L2_MEMORY_DMABUF;
 
 		jpeghal_deinit(fd, buffer_in, buffer_out);
 		jpeg->fd = -1;
@@ -215,9 +204,9 @@ error:
 		jpeg->memory_in->release(jpeg->memory_in);
 		jpeg->memory_in = NULL;
 #ifdef EXYNOS_ION
-		if (jpeg->memory_in_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_in_ion_fd);
-			jpeg->memory_in_ion_fd = -1;
+		if (jpeg->memory_in_ion != NULL) {
+			exynos_ion_free(exynos_camera, jpeg->memory_in_ion);
+			jpeg->memory_in_ion = NULL;
 		}
 #endif
 	}
@@ -227,9 +216,9 @@ error:
 		jpeg->memory_out = NULL;
 
 #ifdef EXYNOS_ION
-		if (jpeg->memory_out_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_out_ion_fd);
-			jpeg->memory_out_ion_fd = -1;
+		if (jpeg->memory_out_ion >= 0) {
+			exynos_ion_free(exynos_camera, jpeg->memory_out_ion);
+			jpeg->memory_out_ion = NULL;
 		}
 #endif
 	}
@@ -272,9 +261,9 @@ void exynos_jpeg_stop(struct exynos_camera *exynos_camera,
 		jpeg->memory_in->release(jpeg->memory_in);
 		jpeg->memory_in = NULL;
 #ifdef EXYNOS_ION
-		if (jpeg->memory_in_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_in_ion_fd);
-			jpeg->memory_in_ion_fd = -1;
+		if (jpeg->memory_in_ion != NULL) {
+			exynos_ion_free(exynos_camera, jpeg->memory_in_ion);
+			jpeg->memory_in_ion = NULL;
 		}
 #endif
 	}
@@ -284,9 +273,9 @@ void exynos_jpeg_stop(struct exynos_camera *exynos_camera,
 		jpeg->memory_out = NULL;
 
 #ifdef EXYNOS_ION
-		if (jpeg->memory_out_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_out_ion_fd);
-			jpeg->memory_out_ion_fd = -1;
+		if (jpeg->memory_out_ion != NULL) {
+			exynos_ion_free(exynos_camera, jpeg->memory_out_ion);
+			jpeg->memory_out_ion = NULL;
 		}
 #endif
 	}
@@ -321,39 +310,19 @@ int exynos_jpeg(struct exynos_camera *exynos_camera, struct exynos_jpeg *jpeg)
 		goto error;
 	}
 
-#ifdef EXYNOS_ION
-	if (jpeg->memory_in != NULL && jpeg->memory_in_ion_fd >= 0) {
-		rc = exynos_ion_msync(exynos_camera, jpeg->memory_in_ion_fd, 0, buffer_in->length[0]);
-		if (rc < 0) {
-			ALOGE("%s: Unable to sync ION memory", __func__);
-			goto error;
-		}
-	}
-#endif
-
 	rc = jpeghal_enc_exe(fd, buffer_in, buffer_out);
 	if (rc < 0) {
 		ALOGE("%s: Unable to encode jpeg", __func__);
 		goto error;
 	}
 
-	memory_size = jpeghal_g_ctrl(fd, V4L2_CID_CAM_JPEG_ENCODEDSIZE);
+	memory_size = buffer_out->bytesused[0]; //jpeghal_g_ctrl(fd, V4L2_CID_CAM_JPEG_ENCODEDSIZE);
 	if (memory_size <= 0) {
 		ALOGE("%s: Unable to get jpeg size", __func__);
 		goto error;
 	}
 
 	jpeg->memory_out_size = memory_size;
-
-#ifdef EXYNOS_ION
-	if (jpeg->memory_out != NULL && jpeg->memory_out_ion_fd >= 0) {
-		rc = exynos_ion_msync(exynos_camera, jpeg->memory_out_ion_fd, 0, memory_size);
-		if (rc < 0) {
-			ALOGE("%s: Unable to sync ION memory", __func__);
-			goto error;
-		}
-	}
-#endif
 
 	rc = 0;
 	goto complete;
@@ -363,10 +332,10 @@ error:
 		// Avoid releasing unrequested mmap buffers
 
 		if (buffer_in->memory == 0)
-			buffer_in->memory = V4L2_MEMORY_USERPTR;
+			buffer_in->memory = V4L2_MEMORY_DMABUF;
 
 		if (buffer_out->memory == 0)
-			buffer_out->memory = V4L2_MEMORY_USERPTR;
+			buffer_out->memory = V4L2_MEMORY_DMABUF;
 
 		jpeghal_deinit(fd, buffer_in, buffer_out);
 		jpeg->fd = -1;
@@ -377,9 +346,9 @@ error:
 		jpeg->memory_in = NULL;
 
 #ifdef EXYNOS_ION
-		if (jpeg->memory_in_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_in_ion_fd);
-			jpeg->memory_in_ion_fd = -1;
+		if (jpeg->memory_in_ion != NULL) {
+			exynos_ion_free(exynos_camera, jpeg->memory_in_ion);
+			jpeg->memory_in_ion = NULL;
 		}
 #endif
 	}
@@ -389,9 +358,9 @@ error:
 		jpeg->memory_out = NULL;
 
 #ifdef EXYNOS_ION
-		if (jpeg->memory_out_ion_fd >= 0) {
-			exynos_ion_free(exynos_camera, jpeg->memory_out_ion_fd);
-			jpeg->memory_out_ion_fd = -1;
+		if (jpeg->memory_out_ion != NULL) {
+			exynos_ion_free(exynos_camera, jpeg->memory_out_ion);;
+			jpeg->memory_out_ion = NULL;
 		}
 #endif
 	}

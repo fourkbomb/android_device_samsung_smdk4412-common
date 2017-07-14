@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2013 Paul Kocialkowski
+ * Copyright (C) 2017 The LineageOS Project
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +32,10 @@
 #include <jpeg_hal.h>
 #endif
 #include <Exif.h>
+
+#ifdef EXYNOS_ION
+#include <linux/ion.h>
+#endif
 
 #include <hardware/hardware.h>
 #include <hardware/camera.h>
@@ -228,7 +233,7 @@ struct exynos_v4l2_output {
 	camera_memory_t *memory;
 	int memory_address;
 #ifdef EXYNOS_ION
-	int memory_ion_fd;
+	struct exynos_ion_data *ion_hnd;
 #endif
 	int memory_index;
 	int buffers_count;
@@ -246,6 +251,14 @@ struct exynos_exif {
 	int memory_size;
 };
 
+#ifdef EXYNOS_ION
+struct exynos_ion_data {
+	ion_user_handle_t hnd;
+	int fd;
+	int size;
+};
+#endif
+
 #ifdef EXYNOS_JPEG_HW
 struct exynos_jpeg {
 	int enabled;
@@ -256,13 +269,13 @@ struct exynos_jpeg {
 	camera_memory_t *memory_in;
 	void *memory_in_pointer;
 #ifdef EXYNOS_ION
-	int memory_in_ion_fd;
+	struct exynos_ion_data *memory_in_ion;
 #endif
 	camera_memory_t *memory_out;
 	void *memory_out_pointer;
 	int memory_out_size;
 #ifdef EXYNOS_ION
-	int memory_out_ion_fd;
+	struct exynos_ion_data *memory_out_ion;
 #endif
 
 	int width;
@@ -506,11 +519,8 @@ int exynos_exif(struct exynos_camera *exynos_camera, struct exynos_exif *exif);
 int exynos_ion_init(struct exynos_camera *exynos_camera);
 int exynos_ion_open(struct exynos_camera *exynos_camera);
 void exynos_ion_close(struct exynos_camera *exynos_camera);
-int exynos_ion_alloc(struct exynos_camera *exynos_camera, int size);
-int exynos_ion_free(struct exynos_camera *exynos_camera, int fd);
-int exynos_ion_phys(struct exynos_camera *exynos_camera, int fd);
-int exynos_ion_msync(struct exynos_camera *exynos_camera, int fd,
-	int offset, int size);
+struct exynos_ion_data *exynos_ion_alloc(struct exynos_camera *exynos_camera, int size);
+int exynos_ion_free(struct exynos_camera *exynos_camera, struct exynos_ion_data *hnd);
 #endif
 
 /*
